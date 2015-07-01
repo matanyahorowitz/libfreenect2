@@ -33,6 +33,8 @@
 #include <libfreenect2/libfreenect2.hpp>
 #include <libfreenect2/frame_listener_impl.h>
 #include <libfreenect2/threading.h>
+#include <libfreenect2/registration.h>
+#include <libfreenect2/packet_pipeline.h>
 
 bool protonect_shutdown = false;
 
@@ -53,13 +55,67 @@ int main(int argc, char *argv[])
     binpath = program_path.substr(0, executable_name_idx);
   }
 
-
   libfreenect2::Freenect2 freenect2;
-  libfreenect2::Freenect2Device *dev = freenect2.openDefaultDevice();
+  libfreenect2::Freenect2Device *dev = 0;
+  libfreenect2::PacketPipeline *pipeline = 0;
+
+  if(freenect2.enumerateDevices() == 0)
+  {
+    std::cout << "no device connected!" << std::endl;
+    return -1;
+  }
+
+  std::string serial = freenect2.getDefaultDeviceSerialNumber();
+
+  for(int argI = 1; argI < argc; ++argI)
+  {
+    const std::string arg(argv[argI]);
+
+    if(arg == "cpu")
+    {
+      if(!pipeline)
+        pipeline = new libfreenect2::CpuPacketPipeline();
+    }
+    else if(arg == "gl")
+    {
+#ifdef LIBFREENECT2_WITH_OPENGL_SUPPORT
+      if(!pipeline)
+        pipeline = new libfreenect2::OpenGLPacketPipeline();
+#else
+      std::cout << "OpenGL pipeline is not supported!" << std::endl;
+#endif
+    }
+    else if(arg == "cl")
+    {
+#ifdef LIBFREENECT2_WITH_OPENCL_SUPPORT
+      if(!pipeline)
+        pipeline = new libfreenect2::OpenCLPacketPipeline();
+#else
+      std::cout << "OpenCL pipeline is not supported!" << std::endl;
+#endif
+    }
+    else if(arg.find_first_not_of("0123456789") == std::string::npos) //check if parameter could be a serial number
+    {
+      serial = arg;
+    }
+    else
+    {
+      std::cout << "Unknown argument: " << arg << std::endl;
+    }
+  }
+
+  if(pipeline)
+  {
+    dev = freenect2.openDevice(serial, pipeline);
+  }
+  else
+  {
+    dev = freenect2.openDevice(serial);
+  }
 
   if(dev == 0)
   {
-    std::cout << "no device connected or failure opening the default one!" << std::endl;
+    std::cout << "failure opening device!" << std::endl;
     return -1;
   }
 
@@ -68,6 +124,7 @@ int main(int argc, char *argv[])
 
   libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth);
   libfreenect2::FrameMap frames;
+  libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
 
   dev->setColorFrameListener(&listener);
   dev->setIrAndDepthFrameListener(&listener);
@@ -76,6 +133,8 @@ int main(int argc, char *argv[])
   std::cout << "device serial: " << dev->getSerialNumber() << std::endl;
   std::cout << "device firmware: " << dev->getFirmwareVersion() << std::endl;
 
+  libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
+
   while(!protonect_shutdown)
   {
     listener.waitForNewFrame(frames);
@@ -83,9 +142,14 @@ int main(int argc, char *argv[])
     libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 
-    cv::imshow("rgb", cv::Mat(rgb->height, rgb->width, CV_8UC3, rgb->data));
+    cv::imshow("rgb", cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data));
     cv::imshow("ir", cv::Mat(ir->height, ir->width, CV_32FC1, ir->data) / 20000.0f);
     cv::imshow("depth", cv::Mat(depth->height, depth->width, CV_32FC1, depth->data) / 4500.0f);
+
+    registration->apply(rgb,depth,&undistorted,&registered);
+
+    cv::imshow("undistorted", cv::Mat(undistorted.height, undistorted.width, CV_32FC1, undistorted.data) / 4500.0f);
+    cv::imshow("registered", cv::Mat(registered.height, registered.width, CV_8UC4, registered.data));
 
     int key = cv::waitKey(1);
     protonect_shutdown = protonect_shutdown || (key > 0 && ((key & 0xFF) == 27)); // shutdown on escape
@@ -98,6 +162,8 @@ int main(int argc, char *argv[])
   // TODO: bad things will happen, if frame listeners are freed before dev->stop() :(
   dev->stop();
   dev->close();
+
+  delete registration;
 
   return 0;
 }

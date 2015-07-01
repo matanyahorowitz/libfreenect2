@@ -42,6 +42,9 @@
 #ifdef __APPLE__
 #include <OpenCL/cl.hpp>
 #else
+#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
+#include <CL/cl.h>
+#undef CL_VERSION_1_2
 #include <CL/cl.hpp>
 #endif
 
@@ -53,27 +56,6 @@
 
 namespace libfreenect2
 {
-
-bool loadBufferFromResources(const std::string &filename, unsigned char *buffer, const size_t n)
-{
-  size_t length = 0;
-  const unsigned char *data = NULL;
-
-  if(!loadResource(filename, &data, &length))
-  {
-    std::cerr << OUT_NAME("loadBufferFromResources") "failed to load resource: " << filename << std::endl;
-    return false;
-  }
-
-  if(length != n)
-  {
-    std::cerr << OUT_NAME("loadBufferFromResources") "wrong size of resource: " << filename << std::endl;
-    return false;
-  }
-
-  memcpy(buffer, data, length);
-  return true;
-}
 
 std::string loadCLSource(const std::string &filename)
 {
@@ -249,7 +231,7 @@ public:
     {
       cl::Device &dev = devices[i];
       std::string devName, devVendor, devType;
-      size_t devTypeID;
+      cl_device_type devTypeID;
       dev.getInfo(CL_DEVICE_NAME, &devName);
       dev.getInfo(CL_DEVICE_VENDOR, &devVendor);
       dev.getInfo(CL_DEVICE_TYPE, &devTypeID);
@@ -290,7 +272,7 @@ public:
     for(size_t i = 0; i < devices.size(); ++i)
     {
       cl::Device &dev = devices[i];
-      size_t devTypeID;
+      cl_device_type devTypeID;
       dev.getInfo(CL_DEVICE_TYPE, &devTypeID);
 
       if(!selected || (selectedType != CL_DEVICE_TYPE_GPU && devTypeID == CL_DEVICE_TYPE_GPU))
@@ -331,7 +313,7 @@ public:
       if(selectDevice(devices, deviceId))
       {
         std::string devName, devVendor, devType;
-        size_t devTypeID;
+        cl_device_type devTypeID;
         device.getInfo(CL_DEVICE_NAME, &devName);
         device.getInfo(CL_DEVICE_VENDOR, &devVendor);
         device.getInfo(CL_DEVICE_TYPE, &devTypeID);
@@ -366,7 +348,7 @@ public:
     catch(const cl::Error &err)
     {
       std::cerr << OUT_NAME("init") "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
-      throw err;
+      throw;
     }
     return true;
   }
@@ -480,7 +462,7 @@ public:
         std::cout << OUT_NAME("init") "Build Log:\t " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
       }
 
-      throw err;
+      throw;
     }
     programInitialized = true;
     return true;
@@ -525,8 +507,7 @@ public:
     catch(const cl::Error &err)
     {
       std::cerr << OUT_NAME("run") "ERROR: " << err.what() << " (" << err.err() << ")" << std::endl;
-      throw err;
-      return;
+      throw;
     }
   }
 
@@ -649,6 +630,11 @@ void OpenCLDepthPacketProcessor::process(const DepthPacket &packet)
   }
 
   impl_->startTiming();
+
+  impl_->ir_frame->timestamp = packet.timestamp;
+  impl_->depth_frame->timestamp = packet.timestamp;
+  impl_->ir_frame->sequence = packet.sequence;
+  impl_->depth_frame->sequence = packet.sequence;
 
   impl_->run(packet);
 

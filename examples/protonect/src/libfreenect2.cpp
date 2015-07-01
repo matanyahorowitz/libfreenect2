@@ -475,10 +475,35 @@ void Freenect2DeviceImpl::start()
   command_tx_.execute(ReadRgbCameraParametersCommand(nextCommandSeq()), result);
   RgbCameraParamsResponse *rgb_p = reinterpret_cast<RgbCameraParamsResponse *>(result.data);
 
-  rgb_camera_params_.fx = rgb_p->intrinsics[0];
-  rgb_camera_params_.fy = rgb_p->intrinsics[0];
-  rgb_camera_params_.cx = rgb_p->intrinsics[1];
-  rgb_camera_params_.cy = rgb_p->intrinsics[2];
+  rgb_camera_params_.fx = rgb_p->color_f;
+  rgb_camera_params_.fy = rgb_p->color_f;
+  rgb_camera_params_.cx = rgb_p->color_cx;
+  rgb_camera_params_.cy = rgb_p->color_cy;
+
+  rgb_camera_params_.shift_d = rgb_p->shift_d;
+  rgb_camera_params_.shift_m = rgb_p->shift_m;
+
+  rgb_camera_params_.mx_x3y0 = rgb_p->mx_x3y0; // xxx
+  rgb_camera_params_.mx_x0y3 = rgb_p->mx_x0y3; // yyy
+  rgb_camera_params_.mx_x2y1 = rgb_p->mx_x2y1; // xxy
+  rgb_camera_params_.mx_x1y2 = rgb_p->mx_x1y2; // yyx
+  rgb_camera_params_.mx_x2y0 = rgb_p->mx_x2y0; // xx
+  rgb_camera_params_.mx_x0y2 = rgb_p->mx_x0y2; // yy
+  rgb_camera_params_.mx_x1y1 = rgb_p->mx_x1y1; // xy
+  rgb_camera_params_.mx_x1y0 = rgb_p->mx_x1y0; // x
+  rgb_camera_params_.mx_x0y1 = rgb_p->mx_x0y1; // y
+  rgb_camera_params_.mx_x0y0 = rgb_p->mx_x0y0; // 1
+
+  rgb_camera_params_.my_x3y0 = rgb_p->my_x3y0; // xxx
+  rgb_camera_params_.my_x0y3 = rgb_p->my_x0y3; // yyy
+  rgb_camera_params_.my_x2y1 = rgb_p->my_x2y1; // xxy
+  rgb_camera_params_.my_x1y2 = rgb_p->my_x1y2; // yyx
+  rgb_camera_params_.my_x2y0 = rgb_p->my_x2y0; // xx
+  rgb_camera_params_.my_x0y2 = rgb_p->my_x0y2; // yy
+  rgb_camera_params_.my_x1y1 = rgb_p->my_x1y1; // xy
+  rgb_camera_params_.my_x1y0 = rgb_p->my_x1y0; // x
+  rgb_camera_params_.my_x0y1 = rgb_p->my_x0y1; // y
+  rgb_camera_params_.my_x0y0 = rgb_p->my_x0y0; // 1
 
   command_tx_.execute(ReadStatus0x090000Command(nextCommandSeq()), result);
   std::cout << "[Freenect2DeviceImpl] ReadStatus0x090000 response" << std::endl;
@@ -540,10 +565,6 @@ void Freenect2DeviceImpl::stop()
   std::cout << "[Freenect2DeviceImpl] canceling usb transfers..." << std::endl;
   rgb_transfer_pool_.cancel();
   ir_transfer_pool_.cancel();
-
-  // wait for completion of transfer cancelation
-  // TODO: better implementation
-  libfreenect2::this_thread::sleep_for(libfreenect2::chrono::milliseconds(1500));
 
   usb_control_.setIrInterfaceState(UsbControl::Disabled);
 

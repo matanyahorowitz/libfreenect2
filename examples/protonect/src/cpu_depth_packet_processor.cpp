@@ -32,6 +32,8 @@
 #include <iostream>
 #include <fstream>
 
+#include <limits>
+
 #if defined(WIN32)
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -42,7 +44,7 @@ namespace libfreenect2
 
 bool loadBufferFromFile2(const std::string& filename, unsigned char *buffer, size_t n)
 {
-  bool success = true;
+  bool success;
   std::ifstream in(filename.c_str());
 
   in.read(reinterpret_cast<char*>(buffer), n);
@@ -578,7 +580,7 @@ public:
         {
           if(max_edge_test_ok)
           {
-            float tmp1 = 1500.0f > raw_depth ? 30.0f : 0.02f * raw_depth;
+            //float tmp1 = 1500.0f > raw_depth ? 30.0f : 0.02f * raw_depth;
             float edge_count = 0.0f;
 
             *depth_out = edge_count > params.max_edge_count ? 0.0f : raw_depth;
@@ -740,6 +742,11 @@ void CpuDepthPacketProcessor::process(const DepthPacket &packet)
   if(listener_ == 0) return;
 
   impl_->startTiming();
+
+  impl_->ir_frame->timestamp = packet.timestamp;
+  impl_->depth_frame->timestamp = packet.timestamp;
+  impl_->ir_frame->sequence = packet.sequence;
+  impl_->depth_frame->sequence = packet.sequence;
 
   cv::Mat m = cv::Mat::zeros(424, 512, CV_32FC(9)), m_filtered = cv::Mat::zeros(424, 512, CV_32FC(9)), m_max_edge_test = cv::Mat::ones(424, 512, CV_8UC1);
 

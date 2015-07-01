@@ -24,51 +24,44 @@
  * either License.
  */
 
-#ifndef FRAME_LISTENER_HPP_
-#define FRAME_LISTENER_HPP_
+#ifndef REGISTRATION_H_
+#define REGISTRATION_H_
 
-#include <cstddef>
-#include <stdint.h>
+#include <string>
 #include <libfreenect2/config.h>
+#include <libfreenect2/libfreenect2.hpp>
+#include <libfreenect2/frame_listener.hpp>
 
 namespace libfreenect2
 {
 
-struct LIBFREENECT2_API Frame
-{
-  enum Type
-  {
-    Color = 1,
-    Ir = 2,
-    Depth = 4
-  };
-
-  uint32_t timestamp;
-  uint32_t sequence;
-  size_t width, height, bytes_per_pixel;
-  unsigned char* data;
-
-  Frame(size_t width, size_t height, size_t bytes_per_pixel) :
-    width(width),
-    height(height),
-    bytes_per_pixel(bytes_per_pixel)
-  {
-    data = new unsigned char[width * height * bytes_per_pixel];
-  }
-
-  ~Frame()
-  {
-    delete[] data;
-  }
-};
-
-class LIBFREENECT2_API FrameListener
+class LIBFREENECT2_API Registration
 {
 public:
-  virtual ~FrameListener();
+  Registration(Freenect2Device::IrCameraParams depth_p, Freenect2Device::ColorCameraParams rgb_p);
 
-  virtual bool onNewFrame(Frame::Type type, Frame *frame) = 0;
+  // undistort/register a single depth data point
+  void apply(int dx, int dy, float dz, float& cx, float &cy) const;
+
+  // undistort/register a whole image
+  void apply(const Frame* rgb, const Frame* depth, Frame* undistorted, Frame* registered, const bool enable_filter = true) const;
+
+private:
+  void distort(int mx, int my, float& dx, float& dy) const;
+  void depth_to_color(float mx, float my, float& rx, float& ry) const;
+
+  Freenect2Device::IrCameraParams depth;
+  Freenect2Device::ColorCameraParams color;
+
+  int distort_map[512 * 424];
+  float depth_to_color_map_x[512 * 424];
+  float depth_to_color_map_y[512 * 424];
+  int depth_to_color_map_yi[512 * 424];
+
+  const int filter_width_half;
+  const int filter_height_half;
+  const float filter_tolerance;
 };
 
 } /* namespace libfreenect2 */
-#endif /* FRAME_LISTENER_HPP_ */
+#endif /* REGISTRATION_H_ */

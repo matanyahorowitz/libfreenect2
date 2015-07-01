@@ -95,7 +95,7 @@ std::string loadShaderSource(const std::string& filename)
 
   if(!loadResource(filename, &data, &length))
   {
-    std::cerr << "failed to load shader source!" << std::endl;
+    std::cerr << "[loadShaderSource] failed to load shader source!" << std::endl;
     return "";
   }
 
@@ -278,12 +278,15 @@ public:
     bindToUnit(GL_TEXTURE0);
     glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexImage2D(GL_TEXTURE_RECTANGLE, 0, FormatT::InternalFormat, width, height, 0, FormatT::Format, FormatT::Type, 0);
   }
 
   void upload()
   {
     bindToUnit(GL_TEXTURE0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexSubImage2D(GL_TEXTURE_RECTANGLE, /*level*/0, /*xoffset*/0, /*yoffset*/0, width, height, FormatT::Format, FormatT::Type, data);
   }
 
@@ -937,6 +940,11 @@ void OpenGLDepthPacketProcessor::process(const DepthPacket &packet)
 
   if(has_listener)
   {
+    ir->timestamp = packet.timestamp;
+    depth->timestamp = packet.timestamp;
+    ir->sequence = packet.sequence;
+    depth->sequence = packet.sequence;
+
     if(!this->listener_->onNewFrame(Frame::Ir, ir))
     {
       delete ir;

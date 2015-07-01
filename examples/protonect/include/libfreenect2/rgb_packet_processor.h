@@ -41,12 +41,11 @@ struct LIBFREENECT2_API RgbPacket
 {
   uint32_t sequence;
 
+  uint32_t timestamp;
   unsigned char *jpeg_buffer;
   size_t jpeg_buffer_length;
 };
 
-// explicit instantiation and export to make vsc++ happy
-template class LIBFREENECT2_API PacketProcessor<RgbPacket>;
 typedef PacketProcessor<RgbPacket> BaseRgbPacketProcessor;
 
 class LIBFREENECT2_API RgbPacketProcessor : public BaseRgbPacketProcessor
